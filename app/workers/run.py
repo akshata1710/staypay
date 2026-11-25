@@ -4,6 +4,7 @@
     python -m app.workers.run sweeper       # re-drive stuck charges and refunds
     python -m app.workers.run inbox         # process stored webhook events
     python -m app.workers.run backfill      # pull missed events from the processor
+    python -m app.workers.run cleanup       # delete expired idempotency keys
     python -m app.workers.run reconcile --date 2026-11-23
     add --once to run a single iteration (handy for debugging and cron jobs)
 
@@ -25,7 +26,7 @@ from prometheus_client import start_http_server
 from app.clock import utcnow
 from app.config import get_settings
 from app.db.session import dispose_engine, get_sessionmaker
-from app.domain import charging, reconciliation, refunds, webhooks
+from app.domain import charging, cleanup, reconciliation, refunds, webhooks
 from app.observability.logging import setup_logging
 from app.processor.client import get_processor
 
@@ -58,11 +59,16 @@ async def backfill_once() -> int:
     return await webhooks.backfill(get_sessionmaker(), get_processor(), since=utcnow() - timedelta(hours=48))
 
 
+async def cleanup_once() -> int:
+    return await cleanup.cleanup_idempotency_keys(get_sessionmaker())
+
+
 WORKERS: dict[str, tuple[Callable[[], Awaitable[int]], float]] = {
     "charge": (charge_once, 5.0),
     "sweeper": (sweeper_once, 60.0),
     "inbox": (inbox_once, 1.0),
     "backfill": (backfill_once, 24 * 3600.0),
+    "cleanup": (cleanup_once, 3600.0),
 }
 
 

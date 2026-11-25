@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     # Idempotency
     idempotency_wait_s: float = 10.0
     idempotency_stale_after_s: int = 60
+    idempotency_key_retention_h: int = 24  # completed keys older than this are deleted (SP-104)
+    idempotency_cleanup_batch_size: int = 1000
 
     # Rate limiting (per guest, per minute) on checkout
     checkout_rate_limit_per_min: int = 10
