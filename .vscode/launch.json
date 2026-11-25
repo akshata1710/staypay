@@ -1,0 +1,80 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "API (uvicorn, reload)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["app.main:app", "--reload", "--port", "8000"],
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": true
+    },
+    {
+      "name": "MockPay",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["mockpay.app:app", "--port", "8100"],
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "Worker: charge",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "app.workers.run",
+      "args": ["charge"],
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "Worker: inbox",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "app.workers.run",
+      "args": ["inbox"],
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "Worker: sweeper",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "app.workers.run",
+      "args": ["sweeper"],
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "Job: backfill (once)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "app.workers.run",
+      "args": ["backfill", "--once"],
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "Job: reconcile today",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "app.workers.run",
+      "args": ["reconcile", "--date", "${input:reconDate}"],
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "Pytest: current file",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}", "-v", "-x"],
+      "justMyCode": false
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full stack (API + MockPay + workers)",
+      "configurations": ["API (uvicorn, reload)", "MockPay", "Worker: charge", "Worker: inbox", "Worker: sweeper"],
+      "stopAll": true
+    }
+  ],
+  "inputs": [
+    { "id": "reconDate", "type": "promptString", "description": "Settlement date (YYYY-MM-DD)" }
+  ]
+}

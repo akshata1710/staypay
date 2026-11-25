@@ -1,0 +1,56 @@
+### Click "Send Request" above each block (VS Code REST Client extension). Env: "local".
+@api = http://localhost:8000
+@mp = http://localhost:8100
+
+### Checkout: 3 installments
+# @name checkout
+POST {{api}}/checkout
+Content-Type: application/json
+Idempotency-Key: try-me-{{$timestamp}}
+
+{
+  "guest_id": "guest_42",
+  "listing_id": "listing_7",
+  "check_in": "{{$datetime 'YYYY-MM-DD' 60 d}}",
+  "total_amount": 120000,
+  "currency": "USD",
+  "installments": 3,
+  "cancellation_policy": "moderate",
+  "payment_method": "pm_card_ok"
+}
+
+### Plan for the reservation above
+GET {{api}}/reservations/{{checkout.response.body.reservation_id}}/plan
+
+### Payment history
+GET {{api}}/reservations/{{checkout.response.body.reservation_id}}/payments?limit=50
+
+### Cancel (refund computed from policy)
+POST {{api}}/reservations/{{checkout.response.body.reservation_id}}/cancel
+Content-Type: application/json
+
+{}
+
+### Payment methods: pm_card_ok | pm_card_insufficient_funds | pm_card_closed | pm_card_expired
+###                  pm_card_stolen | pm_card_do_not_honor | pm_card_processing_error | pm_card_soft_then_ok
+
+### MockPay: inject faults
+POST {{mp}}/admin/faults
+Content-Type: application/json
+
+{ "webhook_drop_rate": 0.2, "webhook_reorder": true, "timeout_rate": 0.05, "settlement_rounding": true }
+
+### MockPay: clear faults
+POST {{mp}}/admin/faults
+Content-Type: application/json
+
+{ "webhook_drop_rate": 0, "webhook_reorder": false, "timeout_rate": 0, "settlement_rounding": false }
+
+### MockPay: what happened to webhooks
+GET {{mp}}/admin/deliveries
+
+### Reconciliation: run for today, then read report
+POST {{api}}/admin/reconciliation/{{$datetime 'YYYY-MM-DD'}}/run
+
+###
+GET {{api}}/admin/reconciliation/{{$datetime 'YYYY-MM-DD'}}

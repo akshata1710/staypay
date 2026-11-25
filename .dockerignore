@@ -1,0 +1,14 @@
+.venv
+.git
+.github
+.vscode
+.devcontainer
+**/__pycache__
+.pytest_cache
+.ruff_cache
+.mypy_cache
+htmlcov
+docs
+tests
+loadtest
+.env

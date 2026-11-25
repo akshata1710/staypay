@@ -1,0 +1,31 @@
+# MockPay for staging / demo clusters only. Production talks to a real processor.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mockpay
+spec:
+  replicas: 1   # state is in memory: must stay at 1
+  selector: { matchLabels: { app: mockpay } }
+  template:
+    metadata:
+      labels: { app: mockpay }
+    spec:
+      containers:
+        - name: mockpay
+          image: ghcr.io/akshata1710/staypay:latest
+          command: ["uvicorn", "mockpay.app:app", "--host", "0.0.0.0", "--port", "8100"]
+          env:
+            - { name: MOCKPAY_WEBHOOK_URL, value: "http://staypay-api/webhooks/mockpay" }
+            - name: MOCKPAY_WEBHOOK_SECRET
+              valueFrom: { secretKeyRef: { name: staypay-secrets, key: STAYPAY_WEBHOOK_SECRET } }
+            - name: MOCKPAY_API_KEYS
+              valueFrom: { secretKeyRef: { name: staypay-secrets, key: STAYPAY_MOCKPAY_API_KEY } }
+          ports: [{ containerPort: 8100 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mockpay
+spec:
+  selector: { app: mockpay }
+  ports: [{ port: 8100, targetPort: 8100 }]

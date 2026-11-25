@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push: { branches: [main] }
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy app
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: staypay, POSTGRES_PASSWORD: staypay, POSTGRES_DB: staypay_test }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U staypay" --health-interval 2s --health-retries 30
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+    env:
+      STAYPAY_TEST_DATABASE_URL: postgresql+asyncpg://staypay:staypay@localhost:5432/staypay_test
+      STAYPAY_DATABASE_URL: postgresql+asyncpg://staypay:staypay@localhost:5432/staypay_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -e ".[dev]"
+      - name: Migrations apply cleanly and match the models
+        run: alembic upgrade head && alembic check
+      - name: Unit + integration
+        run: pytest tests/unit tests/integration -q --cov=app --cov-report=xml
+      - name: Chaos
+        run: pytest tests/chaos -v
+
+  build:
+    needs: [lint, test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions: { contents: read, packages: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:latest
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production   # requires manual approval in repo settings
+    if: ${{ vars.KUBE_DEPLOY_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-kubectl@v4
+      - name: Configure cluster access
+        run: echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > $RUNNER_TEMP/kubeconfig
+      - name: Deploy (migrate job runs first)
+        env: { KUBECONFIG: "${{ runner.temp }}/kubeconfig" }
+        run: |
+          cd deploy/k8s
+          kustomize edit set image ghcr.io/akshata1710/staypay=ghcr.io/${{ github.repository }}:${{ github.sha }}
+          kubectl apply -k .
+          kubectl -n staypay rollout status deploy/staypay-api --timeout=5m

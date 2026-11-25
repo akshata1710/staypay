@@ -1,0 +1,95 @@
+# Long-running workers. They can run with any number of replicas: SKIP LOCKED prevents double work.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: staypay-worker-charge
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: staypay-worker-charge } }
+  template:
+    metadata:
+      labels: { app: staypay-worker-charge }
+      annotations: { prometheus.io/scrape: "true", prometheus.io/port: "9100" }
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: worker
+          image: ghcr.io/akshata1710/staypay:latest
+          command: ["python", "-m", "app.workers.run", "charge", "--metrics-port", "9100"]
+          envFrom: [{ configMapRef: { name: staypay-config } }, { secretRef: { name: staypay-secrets } }]
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { memory: 256Mi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: staypay-worker-inbox
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: staypay-worker-inbox } }
+  template:
+    metadata:
+      labels: { app: staypay-worker-inbox }
+      annotations: { prometheus.io/scrape: "true", prometheus.io/port: "9100" }
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/akshata1710/staypay:latest
+          command: ["python", "-m", "app.workers.run", "inbox", "--metrics-port", "9100"]
+          envFrom: [{ configMapRef: { name: staypay-config } }, { secretRef: { name: staypay-secrets } }]
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { memory: 256Mi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: staypay-worker-sweeper
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: staypay-worker-sweeper } }
+  template:
+    metadata:
+      labels: { app: staypay-worker-sweeper }
+      annotations: { prometheus.io/scrape: "true", prometheus.io/port: "9100" }
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/akshata1710/staypay:latest
+          command: ["python", "-m", "app.workers.run", "sweeper", "--metrics-port", "9100"]
+          envFrom: [{ configMapRef: { name: staypay-config } }, { secretRef: { name: staypay-secrets } }]
+          resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 256Mi } }
+---
+# Nightly jobs
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: staypay-backfill
+spec:
+  schedule: "17 2 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backfill
+              image: ghcr.io/akshata1710/staypay:latest
+              command: ["python", "-m", "app.workers.run", "backfill", "--once"]
+              envFrom: [{ configMapRef: { name: staypay-config } }, { secretRef: { name: staypay-secrets } }]
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: staypay-reconcile
+spec:
+  schedule: "43 4 * * *"   # after the processor publishes yesterday's settlement file
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: reconcile
+              image: ghcr.io/akshata1710/staypay:latest
+              command: ["python", "-m", "app.workers.run", "reconcile"]
+              envFrom: [{ configMapRef: { name: staypay-config } }, { secretRef: { name: staypay-secrets } }]

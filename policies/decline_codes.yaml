@@ -1,0 +1,25 @@
+# How StayPay treats each processor decline code.
+# retryable:     the same card may work later (funds arrive, issuer comes back). Retry with backoff.
+# non_retryable: the card will never work. Don't retry; ask the guest for a new payment method.
+#
+# Unknown codes default to non_retryable (safer: no pointless retries that can look like card
+# testing to issuers). Every unknown code is logged so someone adds it here.
+
+retryable:
+  - insufficient_funds
+  - processing_error
+  - try_again_later
+  - issuer_unavailable
+
+non_retryable:
+  - card_closed
+  - expired_card
+  - stolen_card
+  - lost_card
+  - fraudulent
+  - invalid_account
+  - do_not_honor   # ambiguous in real life; treated as hard here. See docs/tickets for a debate.
+
+retry_schedule:
+  # Delay before attempt N+1, after attempt N failed. Stops early at the payment deadline.
+  delays_hours: [12, 24, 48, 72]

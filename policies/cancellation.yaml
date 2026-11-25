@@ -1,0 +1,30 @@
+# Cancellation policies. Tiers are checked top-down: the first tier whose
+# min_hours_before_checkin is <= the hours remaining until check-in wins.
+# refund_pct is the share of the TOTAL booking price the guest gets back.
+# The guest keeps owing (100 - refund_pct)% of the total; if they've paid less than that,
+# nothing is refunded and the remaining unpaid installments are cancelled.
+
+grace_period:
+  # Applies to every policy: full refund if cancelled within 48h of booking,
+  # as long as check-in is at least 14 days after the cancellation.
+  hours_after_booking: 48
+  min_days_before_checkin: 14
+
+# Policy name -> refund tiers, ordered from earliest to latest cancellation.
+policies:
+  # Flexible: full refund until 24h before check-in, nothing after.
+  flexible:
+    tiers:
+      - { min_hours_before_checkin: 24, refund_pct: 100 }
+      - { min_hours_before_checkin: 0, refund_pct: 0 }
+  # Moderate: full refund until 5 days (120h) before check-in, 50% after.
+  moderate:
+    tiers:
+      - { min_hours_before_checkin: 120, refund_pct: 100 }
+      - { min_hours_before_checkin: 0, refund_pct: 50 }
+  # Strict: full refund until 14 days (336h), 50% until 7 days (168h), nothing after.
+  strict:
+    tiers:
+      - { min_hours_before_checkin: 336, refund_pct: 100 }
+      - { min_hours_before_checkin: 168, refund_pct: 50 }
+      - { min_hours_before_checkin: 0, refund_pct: 0 }

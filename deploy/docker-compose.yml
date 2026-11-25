@@ -1,0 +1,91 @@
+# Full local stack:  docker compose -f deploy/docker-compose.yml up --build
+#   API       http://localhost:8000/docs
+#   MockPay   http://localhost:8100/docs
+#   Grafana   http://localhost:3000   (admin / admin)
+#   Prometheus http://localhost:9090
+name: staypay
+
+x-app: &app
+  build: { context: .., dockerfile: Dockerfile }
+  environment: &app-env
+    STAYPAY_ENV: local
+    STAYPAY_DATABASE_URL: postgresql+asyncpg://staypay:staypay@postgres:5432/staypay
+    STAYPAY_REDIS_URL: redis://redis:6379/0
+    STAYPAY_MOCKPAY_URL: http://mockpay:8100
+    STAYPAY_WEBHOOK_SECRET: ${STAYPAY_SECRET_OVERRIDE:-whsec_dev_secret}  # INC-06 fix sets it
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_started }
+    migrate: { condition: service_completed_successfully }
+
+services:
+  postgres:
+    image: postgres:16
+    environment: { POSTGRES_USER: staypay, POSTGRES_PASSWORD: staypay, POSTGRES_DB: staypay }
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U staypay"]
+      interval: 2s
+      retries: 30
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  migrate:
+    build: { context: .., dockerfile: Dockerfile }
+    command: ["alembic", "upgrade", "head"]
+    environment: *app-env
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  mockpay:
+    build: { context: .., dockerfile: Dockerfile }
+    command: ["uvicorn", "mockpay.app:app", "--host", "0.0.0.0", "--port", "8100"]
+    environment:
+      MOCKPAY_WEBHOOK_URL: http://api:8000/webhooks/mockpay
+      MOCKPAY_WEBHOOK_SECRET: ${MOCKPAY_SECRET_OVERRIDE:-whsec_dev_secret}  # drill INC-06 overrides it
+    ports: ["8100:8100"]
+
+  api:
+    <<: *app
+    ports: ["8000:8000"]
+
+  worker-charge:
+    <<: *app
+    command: ["python", "-m", "app.workers.run", "charge", "--metrics-port", "9101"]
+
+  worker-inbox:
+    <<: *app
+    command: ["python", "-m", "app.workers.run", "inbox", "--metrics-port", "9102"]
+
+  worker-sweeper:
+    <<: *app
+    command: ["python", "-m", "app.workers.run", "sweeper", "--metrics-port", "9103"]
+
+  worker-backfill:
+    <<: *app
+    command: ["python", "-m", "app.workers.run", "backfill", "--metrics-port", "9104"]
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+    ports: ["9090:9090"]
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["3000:3000"]
+
+volumes:
+  pgdata:

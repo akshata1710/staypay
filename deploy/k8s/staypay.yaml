@@ -1,0 +1,94 @@
+# StayPay on Kubernetes. Apply with:  kubectl apply -k deploy/k8s
+# Postgres and Redis are expected to be managed services (RDS / ElastiCache / Cloud SQL ...);
+# their URLs come from the `staypay-secrets` Secret.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: staypay-config
+data:
+  STAYPAY_ENV: "prod"
+  STAYPAY_MOCKPAY_URL: "http://mockpay:8100"
+  STAYPAY_LOG_LEVEL: "INFO"
+---
+# Example only: in real life use sealed-secrets / external-secrets, never commit secrets.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: staypay-secrets
+type: Opaque
+stringData:
+  STAYPAY_DATABASE_URL: "postgresql+asyncpg://staypay:CHANGE_ME@postgres:5432/staypay"
+  STAYPAY_REDIS_URL: "redis://redis:6379/0"
+  STAYPAY_WEBHOOK_SECRET: "CHANGE_ME"
+  STAYPAY_MOCKPAY_API_KEY: "CHANGE_ME"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: staypay-migrate
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: ghcr.io/akshata1710/staypay:latest
+          command: ["alembic", "upgrade", "head"]
+          envFrom: [{ configMapRef: { name: staypay-config } }, { secretRef: { name: staypay-secrets } }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: staypay-api
+  labels: { app: staypay-api }
+spec:
+  replicas: 3
+  strategy: { rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector: { matchLabels: { app: staypay-api } }
+  template:
+    metadata:
+      labels: { app: staypay-api }
+      annotations: { prometheus.io/scrape: "true", prometheus.io/port: "8000" }
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: api
+          image: ghcr.io/akshata1710/staypay:latest
+          ports: [{ containerPort: 8000 }]
+          envFrom: [{ configMapRef: { name: staypay-config } }, { secretRef: { name: staypay-secrets } }]
+          readinessProbe: { httpGet: { path: /health, port: 8000 }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /health, port: 8000 }, periodSeconds: 10, failureThreshold: 3 }
+          resources:
+            requests: { cpu: 250m, memory: 256Mi }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: staypay-api
+spec:
+  selector: { app: staypay-api }
+  ports: [{ port: 80, targetPort: 8000 }]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: staypay-api
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: staypay-api }
+  minReplicas: 3
+  maxReplicas: 12
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 65 } }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: staypay-api
+spec:
+  minAvailable: 2
+  selector: { matchLabels: { app: staypay-api } }

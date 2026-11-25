@@ -1,0 +1,276 @@
+{
+  "title": "StayPay payments",
+  "uid": "staypay-main",
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Checkout outcomes /s",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(checkout_requests_total[5m]))",
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{result}}{{kind}}{{reason}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Checkout p95 latency (s)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{route=\"/checkout\"}[5m])))",
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{result}}{{kind}}{{reason}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Payment history p95 latency (s)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{route=\"/reservations/{reservation_id}/payments\"}[5m])))",
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{result}}{{kind}}{{reason}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Charges by result /s",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (result) (rate(charges_total[5m]))",
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{result}}{{kind}}{{reason}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Processor errors /s",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (kind) (rate(processor_errors_total[5m]))",
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{result}}{{kind}}{{reason}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Recovered vs abandoned (24h)",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(recovered_payments_total[24h])) or vector(0)",
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{result}}{{kind}}{{reason}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Abandoned installments (24h)",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 16
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(abandoned_installments_total[24h])) or vector(0)",
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{result}}{{kind}}{{reason}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Idempotent replays /s",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 16
+      },
+      "targets": [
+        {
+          "expr": "rate(idempotent_replays_total[5m])",
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{result}}{{kind}}{{reason}}"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Webhook inbox oldest unprocessed (s)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 16
+      },
+      "targets": [
+        {
+          "expr": "max(webhook_inbox_oldest_unprocessed_seconds)",
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{result}}{{kind}}{{reason}}"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Webhook processing results /s",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 24
+      },
+      "targets": [
+        {
+          "expr": "sum by (result) (rate(webhook_events_processed_total[5m]))",
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{result}}{{kind}}{{reason}}"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Events recovered by backfill (24h)",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 24
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(backfill_events_inserted_total[24h])) or vector(0)",
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{result}}{{kind}}{{reason}}"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Reconciliation mismatches by reason (7d)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 24
+      },
+      "targets": [
+        {
+          "expr": "sum by (reason) (increase(reconciliation_mismatches_total[7d]))",
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{result}}{{kind}}{{reason}}"
+        }
+      ]
+    }
+  ]
+}

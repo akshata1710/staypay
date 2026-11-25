@@ -1,0 +1,47 @@
+groups:
+  - name: staypay
+    rules:
+      - alert: WebhookInboxBacklog
+        expr: max(webhook_inbox_oldest_unprocessed_seconds) > 300
+        for: 2m
+        labels: { severity: page }
+        annotations:
+          summary: "Webhook events unprocessed for more than 5 minutes"
+          runbook: "docs/runbooks/webhook-backlog.md"
+
+      - alert: WebhookDeadLetters
+        expr: increase(webhook_events_processed_total{result="dead"}[15m]) > 0
+        labels: { severity: ticket }
+        annotations:
+          summary: "Webhook events moved to dead letter"
+          runbook: "docs/runbooks/webhook-backlog.md"
+
+      - alert: WebhookSignatureFailures
+        expr: increase(webhook_signature_failures_total[10m]) > 20
+        labels: { severity: page }
+        annotations:
+          summary: "Many webhook signature failures (rotated secret? attack?)"
+          runbook: "docs/runbooks/webhook-backlog.md"
+
+      - alert: ProcessorErrorsHigh
+        expr: sum(rate(processor_errors_total[5m])) / clamp_min(sum(rate(charges_total[5m])), 1) > 0.05
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "More than 5% of processor calls failing"
+          runbook: "docs/runbooks/processor-degraded.md"
+
+      - alert: CheckoutLatencyHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{route="/checkout"}[5m]))) > 2
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: "Checkout p95 above 2s"
+          runbook: "docs/runbooks/processor-degraded.md"
+
+      - alert: ReconciliationMismatches
+        expr: increase(reconciliation_mismatches_total{reason!="CURRENCY_ROUNDING"}[1d]) > 0
+        labels: { severity: ticket }
+        annotations:
+          summary: "Reconciliation found non-rounding mismatches"
+          runbook: "docs/runbooks/reconciliation-mismatch.md"

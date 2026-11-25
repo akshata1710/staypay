@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "db: up + migrate",
+      "type": "shell",
+      "command": "docker compose -f deploy/docker-compose.yml up -d postgres redis && sleep 3 && python -m alembic upgrade head",
+      "problemMatcher": []
+    },
+    { "label": "setup: install", "type": "shell", "command": "make install", "problemMatcher": [] },
+    { "label": "test: unit + integration", "type": "shell", "command": "python -m pytest tests/unit tests/integration -q", "group": { "kind": "test", "isDefault": true }, "problemMatcher": [] },
+    { "label": "test: chaos", "type": "shell", "command": "python -m pytest tests/chaos -v", "group": "test", "problemMatcher": [] },
+    { "label": "test: coverage", "type": "shell", "command": "python -m pytest --cov=app --cov-report=html && echo 'open htmlcov/index.html'", "group": "test", "problemMatcher": [] },
+    { "label": "lint", "type": "shell", "command": "python -m ruff check . && python -m ruff format --check . && python -m mypy app", "problemMatcher": [] },
+    { "label": "stack: up (docker)", "type": "shell", "command": "docker compose -f deploy/docker-compose.yml up --build", "isBackground": true, "problemMatcher": [] },
+    { "label": "stack: down", "type": "shell", "command": "docker compose -f deploy/docker-compose.yml down", "problemMatcher": [] },
+    { "label": "demo: failure scenarios", "type": "shell", "command": "bash scripts/demo.sh", "problemMatcher": [] },
+    { "label": "loadtest", "type": "shell", "command": "python -m locust -f loadtest/locustfile.py --host http://localhost:8000", "isBackground": true, "problemMatcher": [] },
+    {
+      "label": "db: new migration",
+      "type": "shell",
+      "command": "python -m alembic revision --autogenerate -m \"${input:migrationName}\"",
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    { "id": "migrationName", "type": "promptString", "description": "Migration message" }
+  ]
+}
