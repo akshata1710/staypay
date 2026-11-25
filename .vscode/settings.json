@@ -1,5 +1,10 @@
 {
   "python.defaultInterpreterPath": "/usr/local/bin/python",
+  // No venv in the dev container: the Python Environments extension must use the container's system Python.
+  "python-envs.defaultEnvManager": "ms-python.python:system",
+  "python-envs.pythonProjects": [
+    { "path": ".", "envManager": "ms-python.python:system", "packageManager": "ms-python.python:pip" }
+  ],
   "python.envFile": "${workspaceFolder}/.env",
   "python.testing.pytestEnabled": true,
   "python.testing.unittestEnabled": false,
