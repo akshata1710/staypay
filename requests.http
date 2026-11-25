@@ -31,6 +31,12 @@ Content-Type: application/json
 
 {}
 
+### Update the card (reschedules failed/abandoned installments; 409 if cancelled or a charge is in flight)
+PUT {{api}}/reservations/{{checkout.response.body.reservation_id}}/payment-method
+Content-Type: application/json
+
+{ "payment_method": "pm_card_ok" }
+
 ### Payment methods: pm_card_ok | pm_card_insufficient_funds | pm_card_closed | pm_card_expired
 ###                  pm_card_stolen | pm_card_do_not_honor | pm_card_processing_error | pm_card_soft_then_ok
 

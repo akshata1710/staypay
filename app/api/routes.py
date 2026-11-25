@@ -9,13 +9,13 @@ from datetime import date, datetime
 
 from fastapi import APIRouter, Body, Header, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.cache import cache_get, cache_set, rate_limited
 from app.config import get_settings
 from app.db.session import get_sessionmaker
 from app.domain import checkout as checkout_domain
-from app.domain import history, reconciliation, refunds, webhooks
+from app.domain import history, payment_methods, reconciliation, refunds, webhooks
 from app.domain.views import plan_view
 from app.observability.metrics import WEBHOOK_SIGNATURE_FAILURES
 from app.processor.client import get_processor
@@ -67,6 +67,24 @@ async def cancel(reservation_id: uuid.UUID, body: CancelRequest = Body(default_f
         raise HTTPException(404, "reservation not found") from None
     except refunds.PaymentInFlight:
         raise HTTPException(409, "A payment is being processed for this reservation. Retry in a minute.") from None
+
+
+class PaymentMethodRequest(BaseModel):
+    payment_method: str = Field(min_length=1, max_length=64)
+
+
+@router.put(
+    "/reservations/{reservation_id}/payment-method",
+    tags=["plans"],
+    responses={409: {"description": "Reservation closed, or a payment is in flight"}},
+)
+async def put_payment_method(reservation_id: uuid.UUID, body: PaymentMethodRequest):
+    try:
+        return await payment_methods.update_payment_method(get_sessionmaker(), reservation_id, body.payment_method)
+    except LookupError:
+        raise HTTPException(404, "reservation not found") from None
+    except payment_methods.PaymentMethodConflict as e:
+        raise HTTPException(409, f"Can't update the card: {e}.") from None
 
 
 @router.get("/reservations/{reservation_id}/plan", tags=["plans"])
