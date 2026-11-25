@@ -28,6 +28,7 @@ from app.db.models import (
     Reservation,
 )
 from app.domain.events import record_event
+from app.domain.money import format_money
 from app.domain.state_machine import CHARGE_TRANSITIONS, transition
 from app.observability.metrics import REFUNDS
 from app.processor.client import Outcome, ProcessorClient
@@ -61,11 +62,6 @@ class RefundDecision:
     total_refund: int
     allocations: list[dict] = field(default_factory=list)  # [{charge_id, amount}]
     explanation: str = ""
-
-
-# Format minor units for display, e.g. 12345 -> "123.45 USD".
-def _money(cents: int, currency: str) -> str:
-    return f"{cents / 100:,.2f} {currency}"
 
 
 def check_in_datetime(check_in: date) -> datetime:
@@ -138,9 +134,9 @@ def compute_refund(
     # Human-readable explanation, stored in the audit and shown to support.
     explanation = (
         f"{policy_name.capitalize()} policy, cancelled {hours_before:.1f}h before check-in "
-        f"(rule {rule}): {pct}% of the {_money(total_amount, currency)} total is refundable. "
-        f"Guest paid {_money(paid, currency)} and keeps owing {_money(owed, currency)}, "
-        f"so the refund is {_money(total_refund, currency)}."
+        f"(rule {rule}): {pct}% of the {format_money(total_amount, currency)} total is refundable. "
+        f"Guest paid {format_money(paid, currency)} and keeps owing {format_money(owed, currency)}, "
+        f"so the refund is {format_money(total_refund, currency)}."
     )
     if paid < owed:
         explanation += " Unpaid installments are cancelled; the shortfall is not collected."
