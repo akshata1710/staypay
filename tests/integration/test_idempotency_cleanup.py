@@ -61,12 +61,11 @@ async def test_purged_key_is_treated_as_new(h):
 
     from app.clock import utcnow
     from app.db.models import IdempotencyKey
-    from app.domain.maintenance import purge_idempotency_keys
 
     r1 = await h.checkout(key="reused-after-purge", guest="g1")
     async with h.sm() as s, s.begin():
         row = await s.get(IdempotencyKey, "reused-after-purge")
         row.created_at = utcnow() - timedelta(days=2)
-    assert await purge_idempotency_keys(h.sm) == 1
+    assert await cleanup_idempotency_keys(h.sm) == 1
     r2 = await h.checkout(key="reused-after-purge", guest="g1")
     assert r1.json()["reservation_id"] != r2.json()["reservation_id"]
