@@ -16,7 +16,7 @@ by webhook yet. Normally the webhook or the sweeper resolves it within ~5 minute
 ## Fix
 - Sweeper down → start it. It re-sends the **same** idempotency key; the processor replays the result.
 - Webhooks missing → run backfill once: `python -m app.workers.run backfill --once`.
-- Do it now (don't wait for the 5-minute window): `python -m app.workers.run sweeper --once`.
+- Do it now (webhooks missing or charges already older than the sweeper window): `python -m app.workers.run sweeper --once`.
 
 ## Never
 - Create a new charge for the guest, or change a charge's idempotency key.
