@@ -70,6 +70,10 @@ services:
     <<: *app
     command: ["python", "-m", "app.workers.run", "backfill", "--metrics-port", "9104"]
 
+  worker-cleanup:
+    <<: *app
+    command: ["python", "-m", "app.workers.run", "cleanup", "--metrics-port", "9105"]
+
   prometheus:
     image: prom/prometheus:v2.54.1
     volumes:

@@ -79,6 +79,24 @@ spec:
 apiVersion: batch/v1
 kind: CronJob
 metadata:
+  name: staypay-cleanup
+spec:
+  schedule: "5 * * * *"   # hourly; each run deletes in batches of 1000
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: cleanup
+              image: ghcr.io/akshata1710/staypay:latest
+              command: ["python", "-m", "app.workers.run", "cleanup", "--once"]
+              envFrom: [{ configMapRef: { name: staypay-config } }, { secretRef: { name: staypay-secrets } }]
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
   name: staypay-reconcile
 spec:
   schedule: "43 4 * * *"   # after the processor publishes yesterday's settlement file

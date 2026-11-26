@@ -11,6 +11,7 @@ HTTP_LATENCY = Histogram(
 
 CHECKOUTS = Counter("checkout_requests_total", "Checkout requests by outcome", ["outcome"])
 IDEMPOTENT_REPLAYS = Counter("idempotent_replays_total", "Requests answered from a stored response")
+IDEMPOTENCY_KEYS_DELETED = Counter("idempotency_keys_deleted_total", "Expired idempotency keys deleted by cleanup")
 
 CHARGES = Counter("charges_total", "Charge attempts by result", ["result"])
 PROCESSOR_ERRORS = Counter("processor_errors_total", "Processor calls that failed", ["kind"])

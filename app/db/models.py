@@ -145,6 +145,7 @@ class PaymentEvent(Base):
 # Checkout Idempotency-Key: who owns the request, how far it got, and the response to replay.
 class IdempotencyKey(Base):
     __tablename__ = "idempotency_keys"
+    __table_args__ = (Index("ix_idempotency_keys_created_at", "created_at"),)  # cleanup scans by age
 
     key: Mapped[str] = mapped_column(String(200), primary_key=True)
     request_hash: Mapped[str] = mapped_column(String(64))

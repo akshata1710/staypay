@@ -9,4 +9,4 @@ scrape_configs:
     static_configs: [{ targets: ["api:8000"] }]
   - job_name: workers
     static_configs:
-      - targets: ["worker-charge:9101", "worker-inbox:9102", "worker-sweeper:9103", "worker-backfill:9104"]
+      - targets: ["worker-charge:9101", "worker-inbox:9102", "worker-sweeper:9103", "worker-backfill:9104", "worker-cleanup:9105"]
