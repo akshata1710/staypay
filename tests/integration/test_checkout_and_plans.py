@@ -140,3 +140,21 @@ async def test_checkout_rate_limit(h):
         await h.checkout(guest="spammer", total=100 + i)
     r = await h.checkout(guest="spammer", total=999)
     assert r.status_code == 429
+
+
+async def test_unsupported_currency_is_rejected(h):
+    r = await h.api.post(
+        "/checkout",
+        json={
+            "guest_id": "guest_xyz",
+            "listing_id": "listing_1",
+            "check_in": "2027-01-15",
+            "total_amount": 1000,
+            "currency": "XYZ",
+            "installments": 1,
+            "cancellation_policy": "moderate",
+            "payment_method": "pm_card_ok",
+        },
+        headers={"Idempotency-Key": "unsupported-currency-1"},
+    )
+    assert r.status_code == 422

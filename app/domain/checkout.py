@@ -34,6 +34,7 @@ from app.config import get_settings
 from app.db.models import Charge, IdempotencyKey, Installment, PaymentPlan, Reservation
 from app.domain.charging import execute_charge, start_attempt
 from app.domain.events import record_event
+from app.domain.money import exponent
 from app.domain.plans import build_schedule, payment_deadline
 from app.domain.views import plan_view
 from app.observability.metrics import CHECKOUTS, IDEMPOTENT_REPLAYS
@@ -58,6 +59,16 @@ class CheckoutRequest(BaseModel):
     @classmethod
     def upper(cls, v: str) -> str:
         return v.upper()
+
+    # Reject unsupported currencies right away.
+    @field_validator("currency")
+    @classmethod
+    def check_supported_currency(cls, v: str) -> str:
+        try:
+            exponent(v)
+        except ValueError:
+            raise ValueError("unsupported_currency") from None
+        return v
 
 
 # HTTP status and body to return, plus whether it was replayed from a stored response.
